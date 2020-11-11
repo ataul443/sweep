@@ -21,8 +21,7 @@ func TestSweep(t *testing.T) {
 	}
 
 	for _, v := range tcs {
-		err := cache.Put(v.Key, v.Value)
-		assert.NoError(t, err, "put should be successful for key1")
+		cache.Put(v.Key, v.Value)
 
 		actualVal, err := cache.Get(v.Key)
 		assert.NoErrorf(t, err, "get should be successful for %s", v.Key)
