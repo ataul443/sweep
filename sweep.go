@@ -1,7 +1,6 @@
 package sweep
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -9,6 +8,8 @@ type Sweep struct {
 	cache map[string]*entry
 
 	entryLifetime time.Duration
+
+	closeCh chan struct{}
 }
 
 type entry struct {
@@ -18,9 +19,14 @@ type entry struct {
 
 // Get retrieves value associated with the key from the sweep.
 func (s *Sweep) Get(key string) (value []byte, err error) {
+	if s.isClosed() {
+		err = ErrClosed
+		return
+	}
+
 	e, ok := s.cache[key]
 	if !ok {
-		err = fmt.Errorf("key %s, not found in sweep", key)
+		err = ErrEntryNotFound
 		return
 	}
 
@@ -29,9 +35,26 @@ func (s *Sweep) Get(key string) (value []byte, err error) {
 }
 
 // Put inserts the value associated with the key into the sweep.
-func (s *Sweep) Put(key string, value []byte) {
+func (s *Sweep) Put(key string, value []byte) error {
+	if s.isClosed() {
+		return ErrClosed
+	}
+
 	s.cache[key] = &entry{Val: value, CreatedAt: time.Now()}
-	return
+
+	return nil
+}
+
+// Close closes the sweep and removes all entries.
+func (s *Sweep) Close() error {
+	select {
+	case <-s.closeCh:
+		return ErrClosed
+	default:
+		s.closeCh <- struct{}{}
+	}
+
+	return nil
 }
 
 // Default return's sweep with default entry lifetime of 10 minutes.
@@ -69,9 +92,20 @@ func (s *Sweep) startBackgroundCleanupLoop() {
 	go func() {
 		for {
 			select {
+			case <-s.closeCh:
+				return
 			case <-ticker.C:
 				s.cleanupExpiredEntries()
 			}
 		}
 	}()
+}
+
+func (s *Sweep) isClosed() bool {
+	select {
+	case <-s.closeCh:
+		return true
+	default:
+		return false
+	}
 }

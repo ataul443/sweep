@@ -22,7 +22,8 @@ func TestSweep(t *testing.T) {
 	}
 
 	for _, v := range tcs {
-		cache.Put(v.Key, v.Value)
+		err := cache.Put(v.Key, v.Value)
+		assert.NoErrorf(t, err, "put should be successful with key %s", v.Key)
 
 		actualVal, err := cache.Get(v.Key)
 		assert.NoErrorf(t, err, "get should be successful for %s", v.Key)
@@ -52,7 +53,8 @@ func TestSweepEntryExpiration(t *testing.T) {
 
 	t.Run("cache should not have any expired entries", func(t *testing.T) {
 		for _, v := range tcs {
-			cache.Put(v.Key, v.Value)
+			err := cache.Put(v.Key, v.Value)
+			assert.NoErrorf(t, err, "put should be successful with key %s", v.Key)
 		}
 
 		time.Sleep(2 * time.Second)
@@ -65,7 +67,8 @@ func TestSweepEntryExpiration(t *testing.T) {
 
 	t.Run("cache should contain entries which doesn't expired yet", func(t *testing.T) {
 		for _, v := range tcs {
-			cache.Put(v.Key, v.Value)
+			err := cache.Put(v.Key, v.Value)
+			assert.NoErrorf(t, err, "put should be successful with key %s", v.Key)
 
 			actualVal, err := cache.Get(v.Key)
 			assert.NoErrorf(t, err, "get should be successful for %s", v.Key)
