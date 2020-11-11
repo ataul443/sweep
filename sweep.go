@@ -6,26 +6,31 @@ import (
 )
 
 type Sweep struct {
-	cache map[string][]byte
+	cache map[string]*entry
 
 	entryLifetime time.Duration
 }
 
+type entry struct {
+	Val       []byte
+	CreatedAt time.Time
+}
+
 // Get retrieves value associated with the key from the sweep.
 func (s *Sweep) Get(key string) (value []byte, err error) {
-	b, ok := s.cache[key]
+	e, ok := s.cache[key]
 	if !ok {
 		err = fmt.Errorf("key %s, not found in sweep", key)
 		return
 	}
 
-	value = b
+	value = e.Val
 	return
 }
 
 // Put inserts the value associated with the key into the sweep.
 func (s *Sweep) Put(key string, value []byte) {
-	s.cache[key] = value
+	s.cache[key] = &entry{Val: value, CreatedAt: time.Now()}
 	return
 }
 
@@ -41,7 +46,7 @@ func New(entryLifetime time.Duration) *Sweep {
 
 func new(entryLifetime time.Duration) *Sweep {
 	return &Sweep{
-		cache:         make(map[string][]byte),
+		cache:         make(map[string]*entry),
 		entryLifetime: entryLifetime,
 	}
 }
