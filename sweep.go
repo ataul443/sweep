@@ -45,8 +45,33 @@ func New(entryLifetime time.Duration) *Sweep {
 }
 
 func new(entryLifetime time.Duration) *Sweep {
-	return &Sweep{
+	s := &Sweep{
 		cache:         make(map[string]*entry),
 		entryLifetime: entryLifetime,
 	}
+
+	s.startBackgroundCleanupLoop()
+
+	return s
+}
+
+func (s *Sweep) cleanupExpiredEntries() {
+	for k, e := range s.cache {
+		if time.Since(e.CreatedAt) > s.entryLifetime {
+			delete(s.cache, k)
+		}
+	}
+}
+
+func (s *Sweep) startBackgroundCleanupLoop() {
+	ticker := time.NewTicker(time.Second)
+
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				s.cleanupExpiredEntries()
+			}
+		}
+	}()
 }
