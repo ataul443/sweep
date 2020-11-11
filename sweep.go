@@ -1,9 +1,14 @@
 package sweep
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type Sweep struct {
 	cache map[string][]byte
+
+	entryLifetime time.Duration
 }
 
 // Get retrieves value associated with the key from the sweep.
@@ -24,6 +29,19 @@ func (s *Sweep) Put(key string, value []byte) {
 	return
 }
 
+// Default return's sweep with default entry lifetime of 10 minutes.
 func Default() *Sweep {
-	return &Sweep{make(map[string][]byte)}
+	defaultEntryLifeTime := 10 * time.Minute
+	return new(defaultEntryLifeTime)
+}
+
+func New(entryLifetime time.Duration) *Sweep {
+	return new(entryLifetime)
+}
+
+func new(entryLifetime time.Duration) *Sweep {
+	return &Sweep{
+		cache:         make(map[string][]byte),
+		entryLifetime: entryLifetime,
+	}
 }
