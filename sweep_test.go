@@ -1,6 +1,9 @@
 package sweep
 
 import (
+	"fmt"
+	"runtime"
+	"strconv"
 	"testing"
 	"time"
 
@@ -77,4 +80,29 @@ func TestSweepEntryExpiration(t *testing.T) {
 				v.Value, actualVal)
 		}
 	})
+}
+
+func TestGCPause(t *testing.T) {
+
+	start := time.Now()
+
+	cache := Default()
+	for i := 0; i < 1e7; i++ {
+		p := strconv.Itoa(i)
+		err := cache.Put(p, []byte(p))
+		if err != nil {
+			panic(err)
+		}
+
+		// fmt.Println("Iteration:", p)
+	}
+
+
+
+	runtime.GC()
+
+	val, _ := cache.Get("100")
+	fmt.Println("100", string(val))
+
+	fmt.Printf("GC Pause took: %.2f\n", time.Since(start).Seconds())
 }
