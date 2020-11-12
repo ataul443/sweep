@@ -1,14 +1,21 @@
 package sweep
 
 import (
+	"hash"
 	"sync"
 	"time"
 )
 
 type Sweep struct {
+	shardsCount uint64
+
+	hasher hash.Hash64
+
 	cache map[string]*entry
 
 	entryLifetime time.Duration
+
+	cleanupInterval time.Duration
 
 	closeCh chan struct{}
 
@@ -66,22 +73,28 @@ func (s *Sweep) Close() error {
 	return nil
 }
 
-// Default return's sweep with default entry lifetime of 10 minutes.
+// Default return's sweep with default entry lifetime
+// of 10 minutes and 1000 shards.
 func Default() *Sweep {
-	defaultEntryLifeTime := 10 * time.Minute
-	return new(defaultEntryLifeTime)
+	cfg := setupVacantDefaultsInConfig(Configuration{})
+
+	return new(cfg)
 }
 
-func New(entryLifetime time.Duration) *Sweep {
-	return new(entryLifetime)
+func New(cfg Configuration) *Sweep {
+	cfg = setupVacantDefaultsInConfig(cfg)
+
+	return new(cfg)
 }
 
-func new(entryLifetime time.Duration) *Sweep {
+func new(cfg Configuration) *Sweep {
 	s := &Sweep{
-		cache:         make(map[string]*entry),
-		entryLifetime: entryLifetime,
-		closeCh:       make(chan struct{}),
-		mu:            &sync.Mutex{},
+		shardsCount:     cfg.ShardsCount,
+		cache:           make(map[string]*entry),
+		entryLifetime:   cfg.EntryLifetime,
+		cleanupInterval: cfg.CleanupInterval,
+		closeCh:         make(chan struct{}),
+		mu:              &sync.Mutex{},
 	}
 
 	s.startBackgroundCleanupLoop()
