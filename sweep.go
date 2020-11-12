@@ -1,6 +1,7 @@
 package sweep
 
 import (
+	"sync"
 	"time"
 )
 
@@ -10,6 +11,8 @@ type Sweep struct {
 	entryLifetime time.Duration
 
 	closeCh chan struct{}
+
+	mu *sync.Mutex
 }
 
 type entry struct {
@@ -23,6 +26,9 @@ func (s *Sweep) Get(key string) (value []byte, err error) {
 		err = ErrClosed
 		return
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	e, ok := s.cache[key]
 	if !ok {
@@ -39,6 +45,9 @@ func (s *Sweep) Put(key string, value []byte) error {
 	if s.isClosed() {
 		return ErrClosed
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	s.cache[key] = &entry{Val: value, CreatedAt: time.Now()}
 
@@ -71,6 +80,8 @@ func new(entryLifetime time.Duration) *Sweep {
 	s := &Sweep{
 		cache:         make(map[string]*entry),
 		entryLifetime: entryLifetime,
+		closeCh:       make(chan struct{}),
+		mu:            &sync.Mutex{},
 	}
 
 	s.startBackgroundCleanupLoop()
@@ -79,6 +90,9 @@ func new(entryLifetime time.Duration) *Sweep {
 }
 
 func (s *Sweep) cleanupExpiredEntries() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	for k, e := range s.cache {
 		if time.Since(e.CreatedAt) > s.entryLifetime {
 			delete(s.cache, k)
