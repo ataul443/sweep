@@ -37,7 +37,8 @@ func TestSweep(t *testing.T) {
 }
 
 func TestSweepEntryExpiration(t *testing.T) {
-	cache := New(time.Second)
+	cfg := Configuration{ShardsCount: 1000, EntryLifetime: time.Second}
+	cache := New(cfg)
 
 	tcs := []keyValPayload{
 		{
@@ -97,12 +98,10 @@ func TestGCPause(t *testing.T) {
 		// fmt.Println("Iteration:", p)
 	}
 
-
-
 	runtime.GC()
 
 	val, _ := cache.Get("100")
 	fmt.Println("100", string(val))
 
-	fmt.Printf("GC Pause took: %.2f\n", time.Since(start).Seconds())
+	fmt.Printf("GC Pause took: %.2f seconds\n.", time.Since(start).Seconds())
 }

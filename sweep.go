@@ -114,7 +114,7 @@ func (s *Sweep) cleanupExpiredEntries() {
 }
 
 func (s *Sweep) startBackgroundCleanupLoop() {
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(s.cleanupInterval)
 
 	go func() {
 		for {
