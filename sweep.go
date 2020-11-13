@@ -1,25 +1,21 @@
 package sweep
 
 import (
-	"hash"
-	"sync"
 	"time"
+
+	"github.com/cespare/xxhash"
 )
 
 type Sweep struct {
-	shardsCount uint64
+	shardsCount int
 
-	hasher hash.Hash64
-
-	cache map[string]*entry
+	shards []*shard
 
 	entryLifetime time.Duration
 
 	cleanupInterval time.Duration
 
 	closeCh chan struct{}
-
-	mu *sync.Mutex
 }
 
 // Get retrieves value associated with the key from the sweep.
@@ -29,16 +25,10 @@ func (s *Sweep) Get(key string) (value []byte, err error) {
 		return
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	keyHash := s.hashKey(key)
+	shardAlloted := s.shards[keyHash&uint64(s.shardsCount)]
 
-	e, ok := s.cache[key]
-	if !ok {
-		err = ErrEntryNotFound
-		return
-	}
-
-	value = e.val
+	value, err = shardAlloted.get(keyHash)
 	return
 }
 
@@ -48,12 +38,10 @@ func (s *Sweep) Put(key string, value []byte) error {
 		return ErrClosed
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	keyHash := s.hashKey(key)
+	shardAlloted := s.shards[keyHash&uint64(s.shardsCount)]
 
-	s.cache[key] = &entry{val: value, createdAt: time.Now().Unix()}
-
-	return nil
+	return shardAlloted.put(keyHash, value)
 }
 
 // Close closes the sweep and removes all entries.
@@ -85,11 +73,15 @@ func New(cfg Configuration) *Sweep {
 func new(cfg Configuration) *Sweep {
 	s := &Sweep{
 		shardsCount:     cfg.ShardsCount,
-		cache:           make(map[string]*entry),
 		entryLifetime:   cfg.EntryLifetime,
 		cleanupInterval: cfg.CleanupInterval,
 		closeCh:         make(chan struct{}),
-		mu:              &sync.Mutex{},
+	}
+
+	// Initialize the shards
+	s.shards = make([]*shard, s.shardsCount)
+	for i := 0; i < s.shardsCount; i++ {
+		s.shards[i] = newShard()
 	}
 
 	s.startBackgroundCleanupLoop()
@@ -98,13 +90,8 @@ func new(cfg Configuration) *Sweep {
 }
 
 func (s *Sweep) cleanupExpiredEntries() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for k, e := range s.cache {
-		if time.Since(time.Unix(e.createdAt, 0)) > s.entryLifetime {
-			delete(s.cache, k)
-		}
+	for _, sh := range s.shards {
+		sh.cleanupExpiredEntries()
 	}
 }
 
@@ -121,6 +108,10 @@ func (s *Sweep) startBackgroundCleanupLoop() {
 			}
 		}
 	}()
+}
+
+func (s *Sweep) hashKey(key string) uint64 {
+	return xxhash.Sum64([]byte(key))
 }
 
 func (s *Sweep) isClosed() bool {
