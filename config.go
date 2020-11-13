@@ -3,8 +3,6 @@ package sweep
 import (
 	"hash"
 	"time"
-
-	"github.com/cespare/xxhash"
 )
 
 const (
@@ -17,7 +15,7 @@ const (
 
 type Configuration struct {
 	// ShardsCount represents a fixed number shards sweep will have.
-	ShardsCount uint64
+	ShardsCount int
 
 	// Hasher represents a hash implementation for hashing keys.
 	Hasher hash.Hash64
@@ -31,12 +29,8 @@ type Configuration struct {
 }
 
 func setupVacantDefaultsInConfig(cfg Configuration) Configuration {
-	if cfg.ShardsCount == 0 {
+	if cfg.ShardsCount <= 0 {
 		cfg.ShardsCount = defaultShardsCount
-	}
-
-	if cfg.Hasher == nil {
-		cfg.Hasher = xxhash.New()
 	}
 
 	if cfg.EntryLifetime == 0 {
