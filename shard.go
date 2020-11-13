@@ -19,3 +19,15 @@ func newShard() *shard {
 		mu:              &sync.Mutex{},
 	}
 }
+
+func (sh *shard) put(hashedKey uint64, value []byte) error {
+	return nil
+}
+
+func (sh *shard) get(hashedKey uint64) ([]byte, error) {
+	return nil, nil
+}
+
+func (s *shard) cleanupExpiredEntries() {
+	// Unimplemented
+}
