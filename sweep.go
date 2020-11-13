@@ -22,11 +22,6 @@ type Sweep struct {
 	mu *sync.Mutex
 }
 
-type entry struct {
-	Val       []byte
-	CreatedAt time.Time
-}
-
 // Get retrieves value associated with the key from the sweep.
 func (s *Sweep) Get(key string) (value []byte, err error) {
 	if s.isClosed() {
@@ -43,7 +38,7 @@ func (s *Sweep) Get(key string) (value []byte, err error) {
 		return
 	}
 
-	value = e.Val
+	value = e.val
 	return
 }
 
@@ -56,7 +51,7 @@ func (s *Sweep) Put(key string, value []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.cache[key] = &entry{Val: value, CreatedAt: time.Now()}
+	s.cache[key] = &entry{val: value, createdAt: time.Now().Unix()}
 
 	return nil
 }
@@ -107,7 +102,7 @@ func (s *Sweep) cleanupExpiredEntries() {
 	defer s.mu.Unlock()
 
 	for k, e := range s.cache {
-		if time.Since(e.CreatedAt) > s.entryLifetime {
+		if time.Since(time.Unix(e.createdAt, 0)) > s.entryLifetime {
 			delete(s.cache, k)
 		}
 	}
