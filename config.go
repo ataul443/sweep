@@ -44,6 +44,18 @@ func setupVacantDefaultsInConfig(cfg Configuration) Configuration {
 		cfg.ShardsCount = defaultShardsCount
 	}
 
+	if !isPowerOfTwo(cfg.ShardsCount) {
+		cfg.ShardsCount = getNextPowerOfTwo(cfg.ShardsCount)
+	}
+
+	if cfg.MaxShardSize <= 0 {
+		cfg.MaxShardSize = defaultShardSize
+	}
+
+	if !isPowerOfTwo(cfg.MaxShardSize) {
+		cfg.MaxShardSize = getNextPowerOfTwo(cfg.MaxShardSize)
+	}
+
 	if cfg.EntryLifetime == 0 {
 		cfg.EntryLifetime = defaultEntryLifeTime
 	}
@@ -52,5 +64,23 @@ func setupVacantDefaultsInConfig(cfg Configuration) Configuration {
 		cfg.CleanupInterval = defaultCleanupInterval
 	}
 
+	if cfg.MaxEntrySize == 0 {
+		cfg.MaxEntrySize = defaultMaxEntrySize
+	}
+
 	return cfg
+}
+
+func getNextPowerOfTwo(n int) int {
+	k := 1
+
+	for k < n {
+		k = k << 1
+	}
+
+	return k
+}
+
+func isPowerOfTwo(n int) bool {
+	return n&(n-1) == 0
 }
