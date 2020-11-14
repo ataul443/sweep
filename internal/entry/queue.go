@@ -96,10 +96,11 @@ func (q *Queue) PeekAt(idx int) (Frame, error) {
 // Grow will increase the queue size to twice of current size with all data
 // intact. It throws error, if queue size reached it max limits.
 func (q *Queue) Grow() error {
-	if (2 * q.Capacity()) > q.maxSize {
+	if q.maxSize != 0 && (2*q.Capacity()) > q.maxSize {
 		return ErrQueueMaxSizeReaced
 	}
 
+	q.bipbuf.Grow()
 	return nil
 }
 
