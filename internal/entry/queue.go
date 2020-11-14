@@ -3,7 +3,8 @@ package entry
 import (
 	"encoding/binary"
 	"errors"
-	"sweep/bipbuffer"
+
+	"github.com/ataul443/sweep/bipbuffer"
 )
 
 const defaultEntryQueueSize = 4 * 1024 // 4KB

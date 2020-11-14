@@ -1,4 +1,4 @@
-module sweep
+module github.com/ataul443/sweep
 
 go 1.15
 

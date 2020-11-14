@@ -1,7 +1,7 @@
 package sweep
 
 import (
-	"sweep/internal/entry"
+	"github.com/ataul443/sweep/internal/entry"
 	"sync"
 	"time"
 )
