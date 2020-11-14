@@ -1,21 +1,20 @@
 package sweep
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/cespare/xxhash"
 )
 
 type Sweep struct {
-	shardsCount int
+	cfg Configuration
 
 	shards []*shard
 
-	entryLifetime time.Duration
-
-	cleanupInterval time.Duration
-
 	closeCh chan struct{}
+
+	entriesCount uint64
 }
 
 // Get retrieves value associated with the key from the sweep.
@@ -26,10 +25,14 @@ func (s *Sweep) Get(key string) (value []byte, err error) {
 	}
 
 	keyHash := s.hashKey(key)
-	shardAlloted := s.shards[keyHash&uint64(s.shardsCount)]
+	shardAlloted := s.shards[s.getShardIndex(keyHash)]
 
-	value, err = shardAlloted.get(keyHash)
-	return
+	val, err := shardAlloted.get(keyHash)
+	if err != nil {
+		return nil, err
+	}
+
+	return val, nil
 }
 
 // Put inserts the value associated with the key into the sweep.
@@ -38,10 +41,27 @@ func (s *Sweep) Put(key string, value []byte) error {
 		return ErrClosed
 	}
 
-	keyHash := s.hashKey(key)
-	shardAlloted := s.shards[keyHash&uint64(s.shardsCount)]
+	if len(value) > s.cfg.MaxEntrySize {
+		return ErrEntryTooLarge
+	}
 
-	return shardAlloted.put(keyHash, value)
+	keyHash := s.hashKey(key)
+	shardAllotted := s.shards[s.getShardIndex(keyHash)]
+
+	err := shardAllotted.put(keyHash, time.Now().Unix(), value)
+	if err != nil {
+		return err
+	}
+
+	atomic.AddUint64(&s.entriesCount, 1)
+	return nil
+}
+
+// EntriesCount returns number of current entries stored.
+// This count includes those entries too which are expired
+// but not cleaned up yet.
+func (s *Sweep) EntriesCount() int {
+	return int(atomic.LoadUint64(&s.entriesCount))
 }
 
 // Close closes the sweep and removes all entries.
@@ -50,38 +70,37 @@ func (s *Sweep) Close() error {
 	case <-s.closeCh:
 		return ErrClosed
 	default:
-		s.closeCh <- struct{}{}
+		close(s.closeCh)
 	}
 
 	return nil
 }
 
-// Default return's sweep with default entry lifetime
+// Default return's sweep with default Entry lifetime
 // of 10 minutes and 1000 shards.
 func Default() *Sweep {
 	cfg := setupVacantDefaultsInConfig(Configuration{})
 
-	return new(cfg)
+	return newSweep(cfg)
 }
 
+// New return a sweep instance configured to given configuration.
 func New(cfg Configuration) *Sweep {
 	cfg = setupVacantDefaultsInConfig(cfg)
 
-	return new(cfg)
+	return newSweep(cfg)
 }
 
-func new(cfg Configuration) *Sweep {
+func newSweep(cfg Configuration) *Sweep {
 	s := &Sweep{
-		shardsCount:     cfg.ShardsCount,
-		entryLifetime:   cfg.EntryLifetime,
-		cleanupInterval: cfg.CleanupInterval,
-		closeCh:         make(chan struct{}),
+		cfg:     cfg,
+		closeCh: make(chan struct{}),
 	}
 
 	// Initialize the shards
-	s.shards = make([]*shard, s.shardsCount)
-	for i := 0; i < s.shardsCount; i++ {
-		s.shards[i] = newShard()
+	s.shards = make([]*shard, cfg.ShardsCount)
+	for i := 0; i < cfg.ShardsCount; i++ {
+		s.shards[i] = newShard(cfg.MaxShardSize)
 	}
 
 	s.startBackgroundCleanupLoop()
@@ -121,4 +140,8 @@ func (s *Sweep) isClosed() bool {
 	default:
 		return false
 	}
+}
+
+func (s *Sweep) getShardIndex(hashedKey uint64) uint64 {
+	return hashedKey & (uint64(s.cfg.ShardsCount - 1))
 }
