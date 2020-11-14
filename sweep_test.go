@@ -1,9 +1,6 @@
 package sweep
 
 import (
-	"fmt"
-	"runtime"
-	"strconv"
 	"testing"
 	"time"
 
@@ -15,7 +12,7 @@ type keyValPayload struct {
 	Value []byte
 }
 
-func TestSweep(t *testing.T) {
+func TestSweep_Get(t *testing.T) {
 	cache := Default()
 
 	tcs := []keyValPayload{
@@ -36,8 +33,27 @@ func TestSweep(t *testing.T) {
 	}
 }
 
+func TestSweep_Put(t *testing.T) {
+	cache := Default()
+
+	tcs := []keyValPayload{
+		{"putKey1", []byte("valueofputKey1")},
+		{"putKey100", []byte("valueofputKey100")},
+		{"putKey985", []byte("valueofputKey985")},
+	}
+
+	for _, v := range tcs {
+		err := cache.Put(v.Key, v.Value)
+		assert.NoErrorf(t, err, "put should be successful with key %s", v.Key)
+	}
+
+	ecount := cache.EntriesCount()
+	assert.Equalf(t, len(tcs), ecount, "expected entries count %d, got %d",
+		len(tcs), ecount)
+}
+
 func TestSweepEntryExpiration(t *testing.T) {
-	cfg := Configuration{ShardsCount: 1000, EntryLifetime: time.Second}
+	cfg := Configuration{ShardsCount: 2, EntryLifetime: 100 * time.Millisecond, CleanupInterval: time.Second}
 	cache := New(cfg)
 
 	tcs := []keyValPayload{
@@ -83,25 +99,10 @@ func TestSweepEntryExpiration(t *testing.T) {
 	})
 }
 
-func TestGCPause(t *testing.T) {
-
-	start := time.Now()
-
+func TestSweep_Close(t *testing.T) {
 	cache := Default()
-	for i := 0; i < 1e7; i++ {
-		p := strconv.Itoa(i)
-		err := cache.Put(p, []byte(p))
-		if err != nil {
-			panic(err)
-		}
+	_ = cache.Close()
 
-		// fmt.Println("Iteration:", p)
-	}
-
-	runtime.GC()
-
-	val, _ := cache.Get("100")
-	fmt.Println("100", string(val))
-
-	fmt.Printf("GC Pause took: %.2f seconds\n.", time.Since(start).Seconds())
+	err := cache.Put("pika", []byte("pika"))
+	assert.EqualErrorf(t, err, ErrClosed.Error(), "expected err %s, got %s", err, ErrClosed)
 }
