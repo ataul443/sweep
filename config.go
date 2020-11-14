@@ -23,8 +23,9 @@ type Configuration struct {
 	ShardsCount int
 
 	// MaxShardSize represents the upper bound limit of a shard size in bytes.
-	// This should be power of two. If it is not, then it will be set
-	// to next power of two greater than current value.
+	// This can be either 0 or should be power of two. If it is not,
+	// then it will be set to next power of two greater than current
+	// value. A zero value means no restriction on shard size.
 	MaxShardSize int
 
 	// EntryLifetime represents lifetime of an Entry in the sweep.
@@ -48,12 +49,14 @@ func setupVacantDefaultsInConfig(cfg Configuration) Configuration {
 		cfg.ShardsCount = getNextPowerOfTwo(cfg.ShardsCount)
 	}
 
-	if cfg.MaxShardSize <= 0 {
+	if cfg.MaxShardSize < 0 {
 		cfg.MaxShardSize = defaultShardSize
 	}
 
-	if !isPowerOfTwo(cfg.MaxShardSize) {
-		cfg.MaxShardSize = getNextPowerOfTwo(cfg.MaxShardSize)
+	if cfg.MaxShardSize != 0 {
+		if !isPowerOfTwo(cfg.MaxShardSize) {
+			cfg.MaxShardSize = getNextPowerOfTwo(cfg.MaxShardSize)
+		}
 	}
 
 	if cfg.EntryLifetime == 0 {
