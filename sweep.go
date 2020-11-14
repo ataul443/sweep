@@ -108,14 +108,22 @@ func newSweep(cfg Configuration) *Sweep {
 	return s
 }
 
-func (s *Sweep) cleanupExpiredEntries() {
+func (s *Sweep) cleanupExpiredEntries() (int, error) {
+	totalEntriesPopped := 0
 	for _, sh := range s.shards {
-		sh.cleanupExpiredEntries()
+		n, err := sh.cleanupExpiredEntries(s.cfg.EntryLifetime)
+		totalEntriesPopped += n
+
+		if err != nil {
+			return totalEntriesPopped, err
+		}
 	}
+
+	return totalEntriesPopped, nil
 }
 
 func (s *Sweep) startBackgroundCleanupLoop() {
-	ticker := time.NewTicker(s.cleanupInterval)
+	ticker := time.NewTicker(s.cfg.CleanupInterval)
 
 	go func() {
 		for {
@@ -123,7 +131,8 @@ func (s *Sweep) startBackgroundCleanupLoop() {
 			case <-s.closeCh:
 				return
 			case <-ticker.C:
-				s.cleanupExpiredEntries()
+				n, _ := s.cleanupExpiredEntries()
+				atomic.AddUint64(&s.entriesCount, ^uint64(n-1))
 			}
 		}
 	}()
